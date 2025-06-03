@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Emalls Extraction API - Official
  * Description: افزونه ای برای استخراج تمامی محصولات ووکامرس برای ایمالز
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: ایمالز
  * Author URI: https://emalls.ir/
  * License: MIT
@@ -160,15 +160,26 @@ if(in_array( 'woocommerce/woocommerce.php', apply_filters('active_plugins', get_
                     array_push($temp_product->image_links, $t_link[0]);
                 }
             }
-            $t_image = wp_get_attachment_image_src($product->get_image_id(), 'full');
-            if($t_image){
-                $temp_product->image_link = $t_image[0];
-                if (!in_array($t_image[0], $temp_product->image_links)){
-                    array_push($temp_product->image_links, $t_image[0]);
-                }
-            }else{
-                $temp_product->image_link = null;
+            
+
+
+            //new
+            $temp_product->image_link = wp_get_attachment_url($product->get_image_id());
+            if($temp_product->image_link){
+                array_unshift($temp_product->image_links, $temp_product->image_link);
             }
+
+
+
+            //$t_image = wp_get_attachment_image_src($product->get_image_id(), 'full');
+            //if($t_image){
+            //    $temp_product->image_link = $t_image[0];
+            //    if (!in_array($t_image[0], $temp_product->image_links)){
+            //        array_push($temp_product->image_links, $t_image[0]);
+            //    }
+            //}else{
+            //    $temp_product->image_link = null;
+            //}
             $temp_product->page_url = get_permalink($product->get_id());
             $temp_product->short_desc = $product->get_short_description();
             $temp_product->spec = array();
@@ -467,6 +478,7 @@ if(in_array( 'woocommerce/woocommerce.php', apply_filters('active_plugins', get_
 				$data['Version'] = $this->emalls_ext_version;
 				$data['NeedSession'] = $need_request;
 				$data['TokenSendByEmalls'] = $emalls_token;
+				$data['SignedByEasy'] = 'chegeni';
 				$data['EasyMode'] = true;
             	return new WP_REST_Response($data, $response_code);
 			}
@@ -511,6 +523,7 @@ if(in_array( 'woocommerce/woocommerce.php', apply_filters('active_plugins', get_
             $data['Version'] = $this->emalls_ext_version;
 			$data['NeedSession'] = $need_request;
 			$data['TokenSendByEmalls'] = $emalls_token;
+			$data['SignedBy'] = 'chegeni';
             return new WP_REST_Response($data, $response_code);
         }
     }

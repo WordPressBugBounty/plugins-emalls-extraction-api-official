@@ -2,8 +2,8 @@
 Contributors: ali3635w
 Tags: products, woocommerce, export, extract, emalls
 Requires at least: 5.2
-Tested up to: 6.6.2
-Stable tag: 1.0.0
+Tested up to: 6.8.1
+Stable tag: 1.1.0
 Requires PHP: 7.0
 License: MIT
 License URI: https://opensource.org/licenses/MIT
@@ -37,3 +37,5 @@ In order to prevent information disclosure to third parties, Emalls sends parame
 = 1.0.0 =
 * منتشر شده
 
+= 1.1.0 =
+* رفع مشکلات جزئی در دریافت تصاویر

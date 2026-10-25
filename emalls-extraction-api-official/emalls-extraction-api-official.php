@@ -2,27 +2,27 @@
 /**
  * Plugin Name: Emalls Extraction API - Official
  * Description: افزونه ای برای استخراج تمامی محصولات ووکامرس برای ایمالز
- * Version: 1.3.0
+ * Version: 1.4.0
  * Author: ایمالز
  * Author URI: https://emalls.ir/
  * License: MIT
  * Text Domain: emalls-extraction-api-official
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
+if (!defined('ABSPATH') ) {
 	exit;
 }
 
 // Timeout تنظیمات سفارشی در درخواست HTTP
-add_filter( 'http_request_timeout', function ( $timeout ) { return 12; }, 9999 );
-add_filter( 'http_request_args', function ( $args ) { $args['timeout'] = 12; return $args; }, 9999 );
+add_filter( 'http_request_timeout', function ($timeout) { return 12; }, 9999);
+add_filter( 'http_request_args', function ($args) { $args['timeout'] = 12; return $args; }, 9999);
 
 // بررسی فعال بودن ووکامرس
-if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) ) ) {
+if (in_array( 'woocommerce/woocommerce.php', apply_filters('active_plugins', get_option('active_plugins')))) {
 
 	class EmallsWooCommerceExtraction extends WP_REST_Controller {
 
-		private $emalls_ext_version = '1.3.0';
+		private $emalls_ext_version = '1.4.0';
 		private $token_cache_expiry = 3600; // یک ساعت
 		private $plugin_slug        = 'emalls_extraction/emalls_ext.php';
 		private $text_domain_slug   = 'emalls-extraction-api-official';
@@ -136,7 +136,11 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 					$temp_product->image_links[] = $t_image[0];
 			} else $temp_product->image_link = null;
 
-			$temp_product->page_url   = $product->get_permalink();
+			if ( $is_child && $parent ) {
+				$temp_product->page_url = $parent->get_permalink();
+			} else {
+				$temp_product->page_url = $product->get_permalink();
+			}
 			$temp_product->short_desc = $product->get_short_description();
 			$temp_product->spec       = array();
 
@@ -147,7 +151,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 			$temp_product->registry     = '';
 			$temp_product->guarantee    = '';
 
-			// تمام بخش ویژه از my-file.txt حفظ شده
+			
 			if ( ! $is_child ) {
 				foreach ( $product->get_attributes() as $attribute ) {
 					if ( isset( $attribute['visible'] ) && $attribute['visible'] == 1 ) {
@@ -224,6 +228,10 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 			$emalls_token   = sanitize_text_field( $request->get_param( 'token' ) );
 			$cached_token   = get_option( 'emalls_connection' );
 			$cached_time    = get_option( 'emalls_connection_time' );
+
+			$site_url    = wp_parse_url( get_site_url() );
+			$shop_domain = str_replace( 'www.', '', $site_url['host'] ?? '' );
+
 			$need_request   = true;
 
 			if ( $cached_token === $emalls_token && $cached_time && ( time() - intval( $cached_time ) ) < $this->token_cache_expiry )
@@ -241,15 +249,35 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 					'plugin_version'      => $this->emalls_ext_version,
 					'woocommerce_version' => $this->woocommerce_version(),
 					'libsodium_version'   => $this->libsodium_version(),
+					'shop_domain'         => $shop_domain
 				);
 				return new WP_REST_Response( $data, 200 );
 			}
 
 			$response = $this->check_request( $request );
 
+
 			if ( is_wp_error( $response ) ) {
-				update_option( 'emalls_connection', '---', false );
-				return new WP_REST_Response( array( 'Error' => $response->get_error_message() ), 500 );
+				// اگر ایمالز در دسترس نبود، بررسی توکن را موفق در نظر بگیر
+				update_option( 'emalls_connection', $emalls_token, false );
+				update_option( 'emalls_connection_time', time(), false );
+
+				$data = $this->get_all_products( $show_variations, $limit, $page );
+
+				$data['Version']           = $this->emalls_ext_version;
+				$data['NeedSession']       = true;
+				$data['TokenSendByEmalls'] = $emalls_token;
+				$data['SignedBy']          = 'chegeni.top';
+				$data['metadata']          = array(
+					'wordpress_version'   => get_bloginfo( 'version' ),
+					'php_version'         => $this->php_version(),
+					'plugin_version'      => $this->emalls_ext_version,
+					'woocommerce_version' => $this->woocommerce_version(),
+					'libsodium_version'   => $this->libsodium_version(),
+					'shop_domain'         => $shop_domain
+				);
+
+				return new WP_REST_Response( $data, 200 );
 			}
 
 			$result = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -268,19 +296,20 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 					'plugin_version'      => $this->emalls_ext_version,
 					'woocommerce_version' => $this->woocommerce_version(),
 					'libsodium_version'   => $this->libsodium_version(),
+					'shop_domain'         => $shop_domain
 				);
 
 				return new WP_REST_Response( $data, 200 );
 			}
 
 			update_option( 'emalls_connection', '---', false );
+
 			return new WP_REST_Response( array( 
 				'Error' => 'Invalid token',
-				'wordpress_version'   => get_bloginfo( 'version' ),
-				'php_version'         => $this->php_version(),
+				'wordpress_version'   => get_bloginfo('version'),
+				'TokenSend'	      => $emalls_token,
 				'plugin_version'      => $this->emalls_ext_version,
-				'woocommerce_version' => $this->woocommerce_version(),
-				'libsodium_version'   => $this->libsodium_version()
+				'shop_domain'         => $shop_domain
 			), 401 );
 		}
 	}
